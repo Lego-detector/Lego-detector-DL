@@ -1,0 +1,61 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environment
+env/
+venv/
+.venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs and debug files
+*.log
+*.out
+*.err
+
+# Model weights
+*.pt
+*.onnx
+*.tflite
+*.pb
+*.weights
+
+# Dataset files
+datasets/
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Ultralytics YOLO cache and output
+runs/
+ultralytics/ # Ultralytics-specific cache
+
+# Environment files
+.env
+*.env
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# OS-specific files
+Thumbs.db
+desktop.ini
+
+# Other temporary files
+*.bak
+*.tmp
+*.old
+*.orig
+*.save
