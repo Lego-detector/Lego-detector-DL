@@ -1,25 +1,26 @@
 import redis
-from common import ENV
+from common.config import ENV
+import asyncio
 
 from module import (
-    RedisConnector, 
     ObjectDetection, 
     LegoDetector, 
-    RedisJobHandler
+    RabbitMQConnector,
+    RabbitMQJobHandler, 
 )
 
 if __name__ == '__main__':
     model_path = './model/yolov8n.pt'
-    redis_connector = RedisConnector(
-        ENV.REDIS_HOST,
-        ENV.REDIS_PORT,
-        ENV.REDIS_USER,
-        ENV.REDIS_PWD,
+    connector = RabbitMQConnector(
+        ENV.MQ_HOST,
+        ENV.MQ_PORT,
+        ENV.MQ_USER,
+        ENV.MQ_PWD,
     )
 
-    redis_client = redis_connector.get_client()
+    client = connector.get_client()
 
-    queue = RedisJobHandler(store=redis_client)
+    queue = RabbitMQJobHandler(channel=client)
     model = ObjectDetection(model_path)
 
     dl_runner = LegoDetector(model, queue)

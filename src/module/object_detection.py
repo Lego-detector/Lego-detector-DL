@@ -58,5 +58,7 @@ class ObjectDetection(AbstractObjectDetection):
             ).to_tuple()
 
             results.append(bbox)
+
+        inp.show()
             
         return results
