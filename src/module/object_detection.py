@@ -13,24 +13,24 @@ from .adapter import AbstractObjectDetection
 
 
 class ObjectDetection(AbstractObjectDetection):
-
     def __init__(self, model_path: str):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.model = self._load_model(model_path)
         self.model.to(self.device)
+        logging.info(f'Current Device: {self.model.device.__str__()}')
 
     def _load_model(self, path):
-        logging.info("Loading model from pt file ...")
+        logging.info('Loading model from pt file ...')
 
         model = YOLO(path)
 
-        logging.info("Model Loaded ...")
+        logging.info('Model Loaded ...')
 
-        logging.info("Fusing model ...")
+        logging.info('Fusing model ...')
 
         model.fuse()
 
-        logging.info("Loading model process complete")
+        logging.info('Loading model process complete')
 
         return model
 
@@ -58,7 +58,5 @@ class ObjectDetection(AbstractObjectDetection):
             ).to_tuple()
 
             results.append(bbox)
-
-        inp.show()
             
         return results

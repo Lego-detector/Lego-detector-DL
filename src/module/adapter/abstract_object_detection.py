@@ -7,7 +7,6 @@ from ultralytics.engine.results import Results
 
 
 class AbstractObjectDetection(ABC):
-    
     @abstractmethod
     def _load_model(self, path):
         raise NotImplementedError()

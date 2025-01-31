@@ -4,12 +4,14 @@ import uuid
 import pika
 from pika.adapters.blocking_connection import BlockingChannel
 
+from common.constant import QueueName
+
 class RabbitMQConnector():
     _instance = None
     __client: BlockingChannel = None
 
     def __new__(cls, host, port, user, pwd):
-        if cls._instance is not None:
+        if (cls._instance is not None):
             logging.info('Has already connect to redis stack')
 
             return cls._instance
@@ -26,6 +28,9 @@ class RabbitMQConnector():
     
     def get_client(self) -> BlockingChannel:
         return self.__client
+    
+    def close(self):
+        self.__client.close()
 
     def __connect(self, host, port, user, pwd) -> BlockingChannel:
         config = pika.ConnectionParameters(
@@ -38,18 +43,7 @@ class RabbitMQConnector():
         
         chan = connection.channel()
 
-        chan.queue_declare('imgdata')
-
-        for i in range(3):
-            with open(f"./test_image/{i}.jpg", "rb") as img_file:
-                img_str = img_file.read().decode("latin1")
-                chan.basic_publish(
-                    '',
-                    routing_key='imgdata',
-                    body=json.dumps({
-                        "uid": uuid.uuid4().hex,
-                        "image": img_str
-                    }),
-                )
+        chan.queue_declare(QueueName.INFERENCE_SESSION)
+        chan.queue_declare(QueueName.INFERENCE_RESPONSE)
 
         return chan

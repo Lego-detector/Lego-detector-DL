@@ -1,6 +1,6 @@
-import redis
+import logging
+import logging.config
 from common.config import ENV
-import asyncio
 
 from module import (
     ObjectDetection, 
@@ -10,6 +10,12 @@ from module import (
 )
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+
     model_path = './model/yolov8n.pt'
     connector = RabbitMQConnector(
         ENV.MQ_HOST,
@@ -25,4 +31,13 @@ if __name__ == '__main__':
 
     dl_runner = LegoDetector(model, queue)
 
-    dl_runner.run()
+    try:
+        dl_runner.run()
+    except Exception as err:
+        ## some notification service here ##
+
+        ###################################
+
+        logging.fatal(err)
+    finally:
+        connector.close()
