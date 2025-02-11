@@ -24,9 +24,10 @@ if __name__ == '__main__':
         ENV.MQ_PWD,
     )
 
-    client = connector.get_client()
+    mq_chan = connector.get_channel()
+    mq_conn = connector.get_connection()
 
-    queue = RabbitMQJobHandler(channel=client)
+    queue = RabbitMQJobHandler(channel=mq_chan, connection=mq_conn)
     model = ObjectDetection(model_path)
 
     dl_runner = LegoDetector(model, queue)

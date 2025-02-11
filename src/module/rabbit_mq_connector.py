@@ -8,7 +8,8 @@ from common.constant import QueueName
 
 class RabbitMQConnector():
     _instance = None
-    __client: BlockingChannel = None
+    __connection: pika.BlockingConnection = None
+    __channel: BlockingChannel = None
 
     def __new__(cls, host, port, user, pwd):
         if (cls._instance is not None):
@@ -17,22 +18,27 @@ class RabbitMQConnector():
             return cls._instance
 
         cls._instance = super().__new__(cls)
-        cls._instance.__client = cls._instance.__connect(
+        cls._instance.__connection = cls._instance.__connect(
             host, 
             port, 
             user, 
             pwd
         )
+        cls._instance.__channel = cls._instance.__connection.channel()
 
         return cls._instance
     
-    def get_client(self) -> BlockingChannel:
-        return self.__client
+    def get_channel(self) -> BlockingChannel:
+        return self.__channel
+    
+    def get_connection(self) -> pika.BlockingConnection:
+        return self.__connection
     
     def close(self):
-        self.__client.close()
+        self.__channel.close()
+        self.__connection.close()
 
-    def __connect(self, host, port, user, pwd) -> BlockingChannel:
+    def __connect(self, host, port, user, pwd) -> pika.BlockingConnection:
         config = pika.ConnectionParameters(
             host=host, 
             port=port,
@@ -43,7 +49,7 @@ class RabbitMQConnector():
         
         chan = connection.channel()
 
-        chan.queue_declare(QueueName.INFERENCE_SESSION)
-        chan.queue_declare(QueueName.INFERENCE_RESPONSE)
+        chan.queue_declare(QueueName.INFERENCE_SESSION, durable=True)
+        chan.queue_declare(QueueName.INFERENCE_RESPONSE, durable=True)
 
-        return chan
+        return connection

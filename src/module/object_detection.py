@@ -48,6 +48,7 @@ class ObjectDetection(AbstractObjectDetection):
             iou=0.7
         )[0]
 
+
     def postprocess(self, inp: Results):
         results = []
         for box in inp.boxes:
