@@ -24,7 +24,7 @@ class RabbitMQJobHandler(AbstractJobHandler):
             self.__channel.queue_declare(queue=QueueName.INFERENCE_SESSION, durable=True)
             
             try:
-                deliver_info, _, msg = self.__queue.__next__()
+                deliver_info, _, msg = next(self.__queue)
             except IndexError:
                 return
 
@@ -65,8 +65,8 @@ class RabbitMQJobHandler(AbstractJobHandler):
             time.sleep(3)
             return
         
-    def __callback_publish(self, ch, response, job):
-        self.__channel.basic_publish(
+    def __callback_publish(self, ch: BlockingChannel, response, job):
+        ch.basic_publish(
                 exchange='',
                 routing_key=QueueName.INFERENCE_RESPONSE,
                 body=response,
@@ -75,4 +75,4 @@ class RabbitMQJobHandler(AbstractJobHandler):
                 )
             )
 
-        self.__channel.basic_ack(job.delivery_tag)
+        ch.basic_ack(job.delivery_tag)

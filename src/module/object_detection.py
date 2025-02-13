@@ -55,8 +55,8 @@ class ObjectDetection(AbstractObjectDetection):
             bbox = BoundingBox(
                 int(box.cls),
                 float(box.conf),
-                box.xywh.tolist()
-            ).to_tuple()
+                box.xywh.tolist().pop()
+            ).to_dict()
 
             results.append(bbox)
             

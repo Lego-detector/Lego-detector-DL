@@ -20,7 +20,7 @@ class LegoDetector():
             responseChan = queue.Queue()
             workers = self.__run_mq_worker(halt_event, jobChan, responseChan)
 
-            # # run object detection on main thread
+            # run object detection on main thread
             self.__inference_worker(jobChan, responseChan, halt_event)
 
         except KeyboardInterrupt as err:
@@ -62,7 +62,6 @@ class LegoDetector():
 
             if (job is None):
                 continue
-
 
             preprocess_img = self.object_dectection.preprocess(job.image)
             output = self.object_dectection.inference(preprocess_img)
