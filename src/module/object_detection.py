@@ -48,14 +48,15 @@ class ObjectDetection(AbstractObjectDetection):
             iou=0.7
         )[0]
 
+
     def postprocess(self, inp: Results):
         results = []
         for box in inp.boxes:
             bbox = BoundingBox(
                 int(box.cls),
                 float(box.conf),
-                box.xywh.tolist()
-            ).to_tuple()
+                box.xywh.tolist().pop()
+            ).to_dict()
 
             results.append(bbox)
             

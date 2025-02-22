@@ -1,6 +1,6 @@
 class InferenceStatus():
     PENDING = 'PENDING'
-    COMPLETED = 'COMPELETED'
+    COMPLETED = 'COMPLETED'
 
 class InferenceResponse():
     def __init__(self, uid, results, delivery_tag, status=InferenceStatus.COMPLETED):
