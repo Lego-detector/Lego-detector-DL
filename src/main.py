@@ -1,5 +1,7 @@
+import sys
 import logging
 import logging.config
+import time
 from common.config import ENV
 
 from module import (
@@ -10,13 +12,15 @@ from module import (
 )
 
 if __name__ == '__main__':
+    # Log setting
+    sys.tracebacklimit = 0
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-    model_path = './model/yolov8n.pt'
+    # MQ setup
     connector = RabbitMQConnector(
         ENV.MQ_HOST,
         ENV.MQ_PORT,
@@ -28,6 +32,9 @@ if __name__ == '__main__':
     mq_conn = connector.get_connection()
 
     queue = RabbitMQJobHandler(channel=mq_chan, connection=mq_conn)
+
+    # DL setup
+    model_path = './model/yolov8n.pt'
     model = ObjectDetection(model_path)
 
     dl_runner = LegoDetector(model, queue)

@@ -1,78 +1,89 @@
-import functools
 import json
 import logging
-import time
+import threading
+
+from collections.abc import Callable
 
 import pika
 from common.constant import QueueName
 from entity import Job, InferenceResponse
 from .adapter import AbstractJobHandler
 from common.config import ENV
-from pika.adapters.blocking_connection import BlockingChannel
+from pika.channel import Channel
 
 
 class RabbitMQJobHandler(AbstractJobHandler):
-    def __init__(self, channel: BlockingChannel, connection: pika.BlockingConnection):
-        self.__channel = channel
+    def __init__(self, channel: Channel, connection: pika.SelectConnection):
         self.__connection = connection
+        self.__channel: Channel = channel
+        self.__get_job_callback = None
+        self.__is_callback_ready = threading.Event()
 
-        self.__queue = self.__channel.consume(queue=QueueName.INFERENCE_SESSION, inactivity_timeout=1)   
+        self.__setup_consumer()
 
-    def get_job(self) -> Job:
-        try:
-            # declare if need
-            self.__channel.queue_declare(queue=QueueName.INFERENCE_SESSION, durable=True)
-            
-            try:
-                deliver_info, _, msg = next(self.__queue)
-            except IndexError:
-                return
+    def register_job_callback(self, callback: Callable[[Job], None]):
+        self.__get_job_callback = callback
+        self.__is_callback_ready.set()
 
-            if (msg is None):
-                return None
-
-            val: dict = json.loads(msg)
-            uid = val.get('uid')
-            image = val.get('image').encode('latin-1')
-
-            return Job(uid, image, deliver_info.delivery_tag)
-        except Exception as err:
-            print('job hanlder', err)
-            time.sleep(3)
-            return
-
-    def mark_job_as_done(self, job_result: InferenceResponse):
+    def mark_job_as_done(self, job_result: InferenceResponse) -> bool:
+        success_flag = threading.Event()
         response = json.dumps({
                 'uid': job_result.uid,
                 'status': job_result.status,
                 'results': job_result.results
             })
         
-        try:
-            self.__channel.queue_declare(queue=QueueName.INFERENCE_RESPONSE, durable=True)
+        def publish_callback():
+            try:
+                if self.__channel and not self.__channel.is_closed:
+                    self.__channel.basic_publish(
+                        exchange="",
+                        routing_key=QueueName.INFERENCE_RESPONSE,
+                        body=response,
+                        properties=pika.BasicProperties(delivery_mode=2),
+                    )
+                    self.__channel.basic_ack(job_result.delivery_tag)
+                    success_flag.set()
+                else:
+                    success_flag.clear()
+                    logging.error("Channel is closed. Cannot publish message.")
+            except Exception as err:
+                logging.error(f"Failed to mark job as done for Job._id: {job_result.uid}, Error: {err}")
 
-            cb = functools.partial(
-                self.__callback_publish, 
-                self.__channel, 
-                response, 
-                job_result
-            )
-            
-            self.__connection.add_callback_threadsafe(cb)
+        self.__connection.ioloop.call_later(0, publish_callback)
+        success_flag.wait()
+        
+        return success_flag.is_set()
+        
+    def __setup_consumer(self):
+        if not self.__channel or self.__channel.is_closed:
+            logging.error("Channel is not available!")
+            return
+
+        self.__channel.queue_declare(queue=QueueName.INFERENCE_SESSION, durable=True)
+        self.__channel.queue_declare(queue=QueueName.INFERENCE_RESPONSE, durable=True)
+
+        self.__channel.basic_consume(
+            queue=QueueName.INFERENCE_SESSION,
+            on_message_callback=self.__get_job,
+            auto_ack=False,
+        )
+
+    def __get_job(self, ch: Channel, method, properties, body) -> None:
+        try:
+            # declare if need
+            self.__channel.queue_declare(queue=QueueName.INFERENCE_SESSION, durable=True)
+
+            val: dict = json.loads(body)
+            uid = val.get('uid')
+            image = val.get('image').encode('latin-1')
+            job = Job(uid, image, method.delivery_tag)
+
+            self.__is_callback_ready.wait()
+
+            if (self.__get_job_callback):
+                self.__get_job_callback(job)
 
         except Exception as err:
-            print('job markdone', err)
-            time.sleep(3)
-            return
-        
-    def __callback_publish(self, ch: BlockingChannel, response, job):
-        ch.basic_publish(
-                exchange='',
-                routing_key=QueueName.INFERENCE_RESPONSE,
-                body=response,
-                properties=pika.BasicProperties(
-                    delivery_mode=2,  # Make message persistent
-                )
-            )
-
-        ch.basic_ack(job.delivery_tag)
+            logging.error(f"Error processing job: {err}")
+            ch.basic_nack(method.delivery_tag, requeue=True)
