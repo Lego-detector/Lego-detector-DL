@@ -1,6 +1,7 @@
 import queue
 import threading
 import logging
+import time
 from entity import InferenceResponse, Job
 from .adapter import AbstractJobHandler, AbstractObjectDetection
 
@@ -16,14 +17,21 @@ class LegoDetector():
     def run(self):
         try:
             halt_event = threading.Event()
-            jobChan = queue.Queue()
-            responseChan = queue.Queue()
-            workers = self.__run_mq_worker(halt_event, jobChan, responseChan)
+            job_chan = queue.Queue()
+            response_chan = queue.Queue()
+
+            self.job_handler.register_job_callback(
+                lambda job: self.__job_handler_worker(job, job_chan)
+            )
+
+            self.job_handler.set_halt_event(halt_event)
+            
+            workers = self.__run_mq_worker(halt_event, job_chan, response_chan)
 
             # run object detection on main thread
-            self.__inference_worker(jobChan, responseChan, halt_event)
+            self.__inference_worker(job_chan, response_chan, halt_event)
 
-        except KeyboardInterrupt as err:
+        except KeyboardInterrupt:
             halt_event.set()  # send halt signal
 
             for worker in workers:
@@ -34,29 +42,20 @@ class LegoDetector():
 
     def __job_handler_worker(
         self, 
-        jobChan: queue.Queue, 
-        halt_event: threading.Event
+        job: Job,
+        job_chan: queue.Queue, 
     ):
-        while (not halt_event.is_set()):
-            if (jobChan.full()):
-                continue
-
-            job = self.job_handler.get_job()
-
-            if (job is None):
-                continue
-
-            jobChan.put(job)
+        job_chan.put(job)
 
     def __inference_worker(
         self, 
-        jobChan: queue.Queue, 
-        responseChan: queue.Queue, 
+        job_chan: queue.Queue, 
+        response_chan: queue.Queue, 
         halt_event: threading.Event
     ):
-        while (not halt_event.is_set() or not jobChan.empty()):
+        while (not halt_event.is_set() or not job_chan.empty()):
             try:
-                job: Job = jobChan.get(timeout=1)
+                job: Job = job_chan.get(timeout=1)
             except queue.Empty:
                 continue 
 
@@ -73,30 +72,42 @@ class LegoDetector():
                 delivery_tag=job.delivery_tag
             )
 
-            responseChan.put(response)
+            response_chan.put(response)
 
     def __mark_done_worker(
         self, 
-        responseChan: queue.Queue, 
+        response_chan: queue.Queue, 
         halt_event: threading.Event
     ):
-        while (not halt_event.is_set() or not responseChan.empty()):
+        # use retry_queue instead of response_chan for data ownership
+        # safer for getting front of queue cause retry_queue.queue[0] is not thread safe
+        # might racecondition when use response_chan.queue[0]
+        retry_queue = queue.Queue()
+
+        while (not halt_event.is_set() or not response_chan.empty()):
             try:
-                response: InferenceResponse = responseChan.get(timeout=1)
+                response: InferenceResponse = response_chan.get(timeout=1)
+                
+                if (response):
+                    retry_queue.put(response)
+
             except queue.Empty:
-                continue 
+                pass 
 
-            if (response is None):
-                continue
+            while (not retry_queue.empty()):
+                res = retry_queue.queue[0]
+                is_success = self.job_handler.mark_job_as_done(res)
 
-            self.job_handler.mark_job_as_done(response)
-            logging.info(f'mark done (uid: {response.uid}, tag: {response.delivery_tag})')
+                if (is_success):
+                    logging.info(f"Marked done (UID: {response.uid}, Tag: {response.delivery_tag})")
+                    retry_queue.get_nowait() 
+                else:
+                    time.sleep(3)
 
-    def __run_mq_worker(self, halt_event, jobChan: threading.Event, responseChan: threading.Event):
+    def __run_mq_worker(self, halt_event, job_chan: threading.Event, response_chan: threading.Event):
         workers = []
         tasks = [
-            {'worker': self.__job_handler_worker, 'args': (jobChan, )},
-            {'worker': self.__mark_done_worker, 'args': (responseChan, )}
+            {'worker': self.__mark_done_worker, 'args': (response_chan, )}
         ]
 
         for t in tasks:
