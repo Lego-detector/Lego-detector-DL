@@ -20,10 +20,15 @@ class LegoDetector():
             job_chan = queue.Queue()
             response_chan = queue.Queue()
 
+            def join_worker():
+                halt_event.set()  # send halt signal
+            
+                for worker in workers:
+                    worker.join()
+
             self.job_handler.register_job_callback(
                 lambda job: self.__job_handler_worker(job, job_chan)
             )
-
             self.job_handler.set_halt_event(halt_event)
             
             workers = self.__run_mq_worker(halt_event, job_chan, response_chan)
@@ -31,12 +36,11 @@ class LegoDetector():
             # run object detection on main thread
             self.__inference_worker(job_chan, response_chan, halt_event)
 
+        except Exception as err:
+            join_worker()
+            raise err
         except KeyboardInterrupt:
-            halt_event.set()  # send halt signal
-
-            for worker in workers:
-                worker.join()
-
+            join_worker()
         finally:
             logging.info('Exiting process.')
 
@@ -61,6 +65,8 @@ class LegoDetector():
 
             if (job is None):
                 continue
+            
+            start = time.time()
 
             preprocess_img = self.object_dectection.preprocess(job.image)
             output = self.object_dectection.inference(preprocess_img)
@@ -73,6 +79,8 @@ class LegoDetector():
             )
 
             response_chan.put(response)
+
+            logging.info(f'Job <{job.uid}> infernece time {(time.time() - start)*1000} ms')
 
     def __mark_done_worker(
         self, 
