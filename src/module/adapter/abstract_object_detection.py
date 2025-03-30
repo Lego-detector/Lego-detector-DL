@@ -4,7 +4,6 @@ from typing import List
 from PIL import Image
 
 import numpy as np
-from ultralytics.engine.results import Results
 
 
 class AbstractObjectDetection(ABC):

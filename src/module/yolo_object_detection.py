@@ -29,7 +29,7 @@ class YoloObjectDetection(AbstractObjectDetection):
 
         logging.info('Fusing model ...')
 
-        # model.fuse()
+        model.fuse()
 
         logging.info('Loading model process complete')
 

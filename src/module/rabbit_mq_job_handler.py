@@ -3,8 +3,6 @@ import logging
 import threading
 
 from collections.abc import Callable
-import time
-from typing import Tuple
 
 import pika
 from common.constant import QueueName

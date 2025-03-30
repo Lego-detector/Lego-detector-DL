@@ -1,4 +1,4 @@
-from .yolo_object_detection import *
+# from .yolo_object_detection import *
 from .yolo_onnx_object_detection import *
 
 from .lego_detector import *
