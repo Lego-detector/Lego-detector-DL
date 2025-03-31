@@ -1,0 +1,29 @@
+# Ignore the Git repository
+.git
+.gitignore
+
+# Ignore system files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+
+
+# Ignore logs and cache
+*.log
+logs/
+cache/
+
+# Ignore build outputs and dependencies
+build/
+dist/
+*.egg-info/
+
+# Ignore IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+.env.example

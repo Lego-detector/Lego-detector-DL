@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from queue import Queue
 import threading
 from entity import Job, InferenceResponse
 

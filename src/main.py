@@ -1,12 +1,11 @@
 import sys
 import logging
 import logging.config
-import threading
-import time
 from common.config import ENV
 
 from module import (
-    ObjectDetection, 
+    YoloOnnxObjectDetection, 
+    # YoloObjectDetection,
     LegoDetector, 
     RabbitMQConnector,
     RabbitMQJobHandler, 
@@ -14,33 +13,34 @@ from module import (
 
 if __name__ == '__main__':
     # Log setting
-    sys.tracebacklimit = 0
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-
-    # MQ setup
-    connector = RabbitMQConnector(
-        ENV.MQ_HOST,
-        ENV.MQ_PORT,
-        ENV.MQ_USER,
-        ENV.MQ_PWD,
-    )
-
-    jobHandler = RabbitMQJobHandler(
-        connector
-    )
-
-    # DL setup
-    model_path = './model/yolov8n.pt'
-    model = ObjectDetection(model_path)
-
-    dl_runner = LegoDetector(model, jobHandler)
-
     try:
+        sys.tracebacklimit = 0
+
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+
+        # # DL setup
+        model_path = './model/best.onnx'
+        model = YoloOnnxObjectDetection(model_path)
+
+        # model_path = './model/yolo11l.pt'
+        # model = YoloObjectDetection(model_path)
+
+        # MQ setup
+        connector = RabbitMQConnector(
+            ENV.MQ_HOST,
+            ENV.MQ_PORT,
+            ENV.MQ_USER,
+            ENV.MQ_PWD,
+        )
+
+        jobHandler = RabbitMQJobHandler(connector)
+
+        dl_runner = LegoDetector(model, jobHandler)
+
         dl_runner.run()
     except Exception as err:
         ## some notification service here ##
@@ -48,5 +48,8 @@ if __name__ == '__main__':
         ###################################
 
         logging.fatal(err)
+        raise err
+    except KeyboardInterrupt:
+        logging.info('end')
     finally:
         connector.close()

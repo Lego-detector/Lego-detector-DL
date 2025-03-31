@@ -88,27 +88,30 @@ class RabbitMQJobHandler(AbstractJobHandler):
 
     def __channel_health_ckeck(self):
         attempts = 0
-        wait_time = 30.0
+        min_wait_time = 20.0
+        wait_time = min_wait_time
 
-        is_produce_chann_down = lambda: not self.__produce_channel or self.__produce_channel.is_closed
-        is_consume_chann_down = lambda: not self.__consume_channel or self.__consume_channel.is_closed
+        is_channel_down = lambda: (
+            not self.__produce_channel or self.__produce_channel.is_closed or
+            not self.__consume_channel or self.__consume_channel.is_closed
+        )
 
         while not self.__halt_event.is_set():
-            if (is_consume_chann_down() or is_produce_chann_down()):
-                wait_time = cal_backoff(attempts, 30, 60)
+            if (is_channel_down()):
+                wait_time = cal_backoff(attempts, min_wait_time, 30)
+                self.__setup_channel()
+
+                if (not is_channel_down()):
+                    continue
 
                 logging.error(f"Channel is not available!. retry in {wait_time}")
 
                 attempts += 1
-                self.__setup_channel()
+            else:
+                attempts = 0
+                wait_time = min_wait_time
+                logging.info(f"Channel is available!.")
 
-                threading.Event().wait(wait_time)
-                continue
-
-            attempts = 0
-            wait_time = 30.0
-
-            logging.info(f"Channel is available!.")
             threading.Event().wait(wait_time)
 
     def __get_job(self, ch: Channel, method, properties, body) -> None:

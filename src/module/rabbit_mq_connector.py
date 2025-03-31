@@ -13,6 +13,10 @@ from module.adapter import AbstractMQConnector
 
 class RabbitMQConnector(AbstractMQConnector):
     _instance = None
+    _lock = threading.Lock()
+    _reconnect_thread = None
+
+
     __connection: pika.SelectConnection = None
     __channel: List[Channel] = [ None, None ]
     __consume_ready_event = threading.Event()
@@ -64,9 +68,13 @@ class RabbitMQConnector(AbstractMQConnector):
             logging.error(f"Error while closing RabbitMQ connection: {e}")
 
     def __start_ioloop(self, host, port, user, pwd) -> pika.SelectConnection:
-        target = functools.partial(self.__connect, host, port, user, pwd)
+        with self._lock:
+            if self._reconnect_thread is None or not self._reconnect_thread.is_alive():
+                self._reconnect_thread = threading.Thread(
+                    target=self.__connect, args=(host, port, user, pwd), daemon=True
+                )
 
-        threading.Thread(target=target, name='Rabbit Connector', daemon=True).start()
+                self._reconnect_thread.start()
 
     def __connect(self, host, port, user, pwd):
         reconnect_attempts = 1
@@ -147,6 +155,6 @@ class RabbitMQConnector(AbstractMQConnector):
         connection: pika.SelectConnection, 
         reason
     ):
-        cls._instance.close()
         logging.warning(f"RabbitMQ connection lost: {reason}. Reconnecting...")
-        cls._instance.__connect(host, port, user, pwd)
+        cls._instance.__close()  # Close the current connection properly
+        cls._instance.__start_ioloop()
