@@ -62,7 +62,7 @@ class YoloOnnxObjectDetection(YoloObjectDetection):
     def postprocess(self, input) -> List[dict]:
         preds, preprocess_img, ori_img = input
 
-        filtered = ops.non_max_suppression(preds, conf_thres=0.25, iou_thres=0.4)
+        filtered = ops.non_max_suppression(preds, conf_thres=0.4, iou_thres=0.7)
 
         boxes = self.img_processor.construct_results(filtered, preprocess_img, [ ori_img ])[0]
 
